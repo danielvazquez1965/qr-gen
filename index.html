@@ -531,8 +531,7 @@
       case 'phone':
         return val.startsWith('tel:') ? val : 'tel:' + val.replace(/\s/g, '');
       default:
-        // Plain text: prefix with zero-width space to prevent auto URL detection
-        return '\u200B' + val;
+        return val;
     }
   }
 
