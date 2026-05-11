@@ -1,53 +1,981 @@
-const CACHE = 'qrgen-v2';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-  'https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap'
-];
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="description" content="Generador de códigos QR offline" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="QR Gen" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>QR Gen</title>
 
-// Install: pre-cache all assets
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
-  );
-  // No skipWaiting: wait for user confirmation before activating
-});
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
 
-// Activate: clean old caches and notify clients
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => {
-      // Notify all open tabs that a new version is ready
-      self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
-        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
-      });
-    })
-  );
-  self.clients.claim();
-});
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-// Fetch: cache-first strategy
-self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(e.request).then((res) => {
-        if (!res || res.status !== 200 || res.type === 'opaque') return res;
-        const clone = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(e.request, clone));
-        return res;
-      }).catch(() => caches.match('/index.html'));
-    })
-  );
-});
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --border: #222222;
+      --accent: #e8ff47;
+      --accent-dim: #b8cc2a;
+      --text: #f0f0f0;
+      --muted: #555555;
+      --radius: 4px;
+    }
 
-// Listen for skip message from the app
-self.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100dvh;
+      padding: 24px 16px 40px;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding-top: 8px;
+    }
+
+    header h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -2px;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    header span {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* Input card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card label {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      padding: 14px;
+      resize: none;
+      min-height: 100px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    textarea::placeholder { color: var(--muted); }
+
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    /* Options row */
+    .options-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .option-group {
+      flex: 1;
+      min-width: 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .option-group label {
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      padding: 8px 10px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+
+    select:focus { border-color: var(--accent); }
+
+    .color-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .color-pick {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .color-pick label {
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 36px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+
+    /* Button */
+    button#generate {
+      width: 100%;
+      background: var(--accent);
+      color: #0a0a0a;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 16px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    button#generate:active {
+      background: var(--accent-dim);
+      transform: scale(0.98);
+    }
+
+    button#generate:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* QR Output */
+    .qr-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 20px 20px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    .qr-card.visible {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .qr-label {
+      font-size: 0.6rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      align-self: flex-start;
+    }
+
+    #qr-container {
+      background: white;
+      padding: 16px;
+      border-radius: 2px;
+      line-height: 0;
+    }
+
+    #qr-container canvas,
+    #qr-container img {
+      display: block;
+      max-width: 240px;
+      width: 240px;
+      height: 240px;
+    }
+
+    .qr-actions {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      padding: 12px 8px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      text-align: center;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--accent);
+      color: #0a0a0a;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      transition: transform 0.3s ease;
+      z-index: 100;
+      white-space: nowrap;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Install banner */
+    #install-banner {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.75rem;
+      color: var(--accent);
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #install-banner.visible { display: flex; }
+
+    #install-btn {
+      background: var(--accent);
+      color: #0a0a0a;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 8px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Counter */
+    .char-count {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .char-count.warn { color: #ff6b6b; }
+
+    /* Type selector */
+    .type-selector {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .type-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      padding: 10px 6px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      text-align: center;
+    }
+
+    .type-btn.active {
+      background: var(--accent);
+      color: #0a0a0a;
+      font-weight: 500;
+    }
+
+    /* Weather widget */
+    .weather-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .weather-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .weather-title {
+      font-size: 0.6rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .weather-offline {
+      font-size: 0.6rem;
+      letter-spacing: 1px;
+      color: #ff6b6b;
+      text-transform: uppercase;
+    }
+
+    .weather-main {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .weather-temp {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .weather-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .weather-desc {
+      font-size: 0.85rem;
+      color: var(--text);
+      text-transform: capitalize;
+    }
+
+    .weather-loc {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .weather-details {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .weather-detail {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .weather-detail span {
+      color: var(--text);
+    }
+
+    /* Forecast row */
+    .forecast-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .forecast-item {
+      flex: 0 0 auto;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 54px;
+    }
+
+    .forecast-time {
+      font-size: 0.6rem;
+      color: var(--muted);
+    }
+
+    .forecast-icon {
+      font-size: 1.1rem;
+    }
+
+    .forecast-temp {
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .weather-loading {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      padding: 8px 0;
+    }
+
+    .weather-contact {
+      font-size: 0.6rem;
+      color: var(--muted);
+      text-align: right;
+      letter-spacing: 1px;
+    }
+
+    .weather-contact a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    /* Update banner */
+    #update-banner {
+      display: none;
+      background: #1a1a00;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.75rem;
+      color: var(--accent);
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #update-banner.visible { display: flex; }
+
+    #update-btn {
+      background: var(--accent);
+      color: #0a0a0a;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 8px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <h1>QR_</h1>
+    <span>Generador offline</span>
+  </header>
+
+  <!-- Install banner -->
+  <div id="install-banner">
+    <span>📲 Instalá la app en tu celular</span>
+    <button id="install-btn">Instalar</button>
+  </div>
+
+  <!-- Update banner -->
+  <div id="update-banner">
+    <span>🆕 Hay una nueva versión disponible</span>
+    <button id="update-btn">Actualizar</button>
+  </div>
+
+  <!-- Input card -->
+  <div class="card">
+    <label>Tipo de contenido</label>
+    <div class="type-selector">
+      <button class="type-btn active" data-type="text">Texto</button>
+      <button class="type-btn" data-type="url">URL</button>
+      <button class="type-btn" data-type="email">Email</button>
+      <button class="type-btn" data-type="phone">Telefono</button>
+    </div>
+
+    <label id="input-label">Texto libre</label>
+    <textarea id="text-input" placeholder="Escribi cualquier texto..." maxlength="2000" rows="4"></textarea>
+    <div class="char-count" id="char-count">0 / 2000</div>
+
+    <div class="options-row">
+      <div class="option-group">
+        <label>Nivel de error</label>
+        <select id="error-level">
+          <option value="L">Bajo (L)</option>
+          <option value="M" selected>Medio (M)</option>
+          <option value="Q">Alto (Q)</option>
+          <option value="H">Máximo (H)</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>Tamaño</label>
+        <select id="qr-size">
+          <option value="180">Chico</option>
+          <option value="240" selected>Mediano</option>
+          <option value="300">Grande</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="color-row">
+      <div class="color-pick">
+        <label>Color QR</label>
+        <input type="color" id="color-dark" value="#000000" />
+      </div>
+      <div class="color-pick">
+        <label>Fondo</label>
+        <input type="color" id="color-light" value="#ffffff" />
+      </div>
+    </div>
+
+    <button id="generate">Generar QR</button>
+  </div>
+
+  <!-- Weather widget -->
+  <div class="weather-card" id="weather-card">
+    <div class="weather-header">
+      <span class="weather-title">🌤 Clima local</span>
+      <span class="weather-offline" id="weather-offline-tag" style="display:none">Sin conexión — último dato</span>
+    </div>
+    <div id="weather-body">
+      <div class="weather-loading">Obteniendo ubicación...</div>
+    </div>
+    <div class="weather-contact">
+      ¿Consultas? <a href="mailto:danielvazquez1965@gmail.com">danielvazquez1965@gmail.com</a>
+    </div>
+  </div>
+
+  <!-- Output card -->
+  <div class="qr-card" id="qr-card">
+    <span class="qr-label">Código QR generado</span>
+    <div id="qr-container"></div>
+    <div class="qr-actions">
+      <button class="btn-secondary" id="btn-download">↓ Descargar PNG</button>
+      <button class="btn-secondary" id="btn-copy">⎘ Copiar imagen</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- QR library (offline-capable via cache) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+  // --- PWA Install ---
+  let deferredPrompt;
+  const installBanner = document.getElementById('install-banner');
+  const installBtn = document.getElementById('install-btn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBanner.classList.add('visible');
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBanner.classList.remove('visible');
+  });
+
+  // --- Type selector ---
+  const typeBtns = document.querySelectorAll('.type-btn');
+  const inputLabel = document.getElementById('input-label');
+  const textInput = document.getElementById('text-input');
+  const charCount = document.getElementById('char-count');
+
+  let currentType = 'text';
+
+  const typeConfig = {
+    text:  { label: 'Texto libre',         placeholder: 'Escribi cualquier texto...',      prefix: '' },
+    url:   { label: 'URL o link',           placeholder: 'https://ejemplo.com',             prefix: 'https://' },
+    email: { label: 'Direccion de email',   placeholder: 'nombre@ejemplo.com',              prefix: 'mailto:' },
+    phone: { label: 'Numero de telefono',   placeholder: '+54 9 11 1234-5678',              prefix: 'tel:' },
+  };
+
+  typeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      typeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentType = btn.dataset.type;
+      const cfg = typeConfig[currentType];
+      inputLabel.textContent = cfg.label;
+      textInput.placeholder = cfg.placeholder;
+      textInput.value = '';
+      charCount.textContent = '0 / 2000';
+    });
+  });
+
+  textInput.addEventListener('input', () => {
+    const len = textInput.value.length;
+    charCount.textContent = `${len} / 2000`;
+    charCount.classList.toggle('warn', len > 1500);
+  });
+
+  // Builds the final QR string based on type
+  function buildQRText(raw) {
+    const val = raw.trim();
+    switch (currentType) {
+      case 'url':
+        // Add https:// if no protocol present
+        return /^https?:\/\//i.test(val) ? val : 'https://' + val;
+      case 'email':
+        return val.startsWith('mailto:') ? val : 'mailto:' + val;
+      case 'phone':
+        return val.startsWith('tel:') ? val : 'tel:' + val.replace(/\s/g, '');
+      default:
+        return val;
+    }
   }
-});
+
+  // --- QR Generation ---
+  const generateBtn = document.getElementById('generate');
+  const qrContainer = document.getElementById('qr-container');
+  const qrCard = document.getElementById('qr-card');
+
+  let currentQR = null;
+
+  generateBtn.addEventListener('click', () => {
+    const raw = textInput.value.trim();
+    if (!raw) {
+      showToast('Ingresa algun contenido primero');
+      return;
+    }
+
+    const qrText = buildQRText(raw);
+    const size = parseInt(document.getElementById('qr-size').value);
+    const errorLevel = document.getElementById('error-level').value;
+    const colorDark = document.getElementById('color-dark').value;
+    const colorLight = document.getElementById('color-light').value;
+
+    qrContainer.innerHTML = '';
+    currentQR = null;
+
+    try {
+      currentQR = new QRCode(qrContainer, {
+        text: qrText,
+        width: size,
+        height: size,
+        colorDark: colorDark,
+        colorLight: colorLight,
+        correctLevel: QRCode.CorrectLevel[errorLevel]
+      });
+
+      qrContainer.querySelector('canvas, img').style.width = size + 'px';
+      qrContainer.querySelector('canvas, img').style.height = size + 'px';
+
+      qrCard.classList.add('visible');
+      qrCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {
+      showToast('Error al generar el QR. Texto muy largo?');
+    }
+  });
+
+  // --- Download ---
+  document.getElementById('btn-download').addEventListener('click', () => {
+    const canvas = qrContainer.querySelector('canvas');
+    if (!canvas) { showToast('Generá un QR primero'); return; }
+    const link = document.createElement('a');
+    link.download = 'qr-code.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('Imagen descargada');
+  });
+
+  // --- Copy ---
+  document.getElementById('btn-copy').addEventListener('click', async () => {
+    const canvas = qrContainer.querySelector('canvas');
+    if (!canvas) { showToast('Generá un QR primero'); return; }
+    try {
+      canvas.toBlob(async (blob) => {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        showToast('Imagen copiada al portapapeles');
+      });
+    } catch (e) {
+      showToast('No se pudo copiar (usá Descargar)');
+    }
+  });
+
+  // --- Toast ---
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  // --- Enter key to generate ---
+  textInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.ctrlKey) generateBtn.click();
+  });
+
+  // --- Weather ---
+  const WMO_ICONS = {
+    0:'☀️', 1:'🌤', 2:'⛅', 3:'☁️',
+    45:'🌫', 48:'🌫',
+    51:'🌦', 53:'🌦', 55:'🌧',
+    61:'🌧', 63:'🌧', 65:'🌧',
+    71:'❄️', 73:'❄️', 75:'❄️',
+    80:'🌦', 81:'🌧', 82:'⛈',
+    95:'⛈', 96:'⛈', 99:'⛈'
+  };
+  const WMO_DESC = {
+    0:'Despejado', 1:'Mayormente despejado', 2:'Parcialmente nublado', 3:'Nublado',
+    45:'Niebla', 48:'Niebla con escarcha',
+    51:'Llovizna leve', 53:'Llovizna', 55:'Llovizna intensa',
+    61:'Lluvia leve', 63:'Lluvia', 65:'Lluvia intensa',
+    71:'Nevada leve', 73:'Nevada', 75:'Nevada intensa',
+    80:'Chubascos leves', 81:'Chubascos', 82:'Chubascos fuertes',
+    95:'Tormenta', 96:'Tormenta con granizo', 99:'Tormenta fuerte'
+  };
+
+  const CACHE_KEY = 'qrgen_weather_cache';
+
+  function saveWeatherCache(data) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch(e) {}
+  }
+
+  function loadWeatherCache() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch(e) { return null; }
+  }
+
+  function renderWeather(data, offline) {
+    const body = document.getElementById('weather-body');
+    const offlineTag = document.getElementById('weather-offline-tag');
+    offlineTag.style.display = offline ? 'inline' : 'none';
+
+    const cur = data.current;
+    const code = cur.weather_code;
+    const icon = WMO_ICONS[code] || '🌡';
+    const desc = WMO_DESC[code] || 'Variable';
+
+    // Forecast: next 12h (hourly, from current hour)
+    const now = new Date();
+    const hours = data.hourly.time;
+    const temps = data.hourly.temperature_2m;
+    const codes = data.hourly.weather_code;
+    const startIdx = hours.findIndex(t => new Date(t) >= now);
+    const forecastItems = [];
+    for (let i = startIdx; i < startIdx + 12 && i < hours.length; i += 2) {
+      const h = new Date(hours[i]);
+      const label = h.getHours().toString().padStart(2,'0') + ':00';
+      forecastItems.push(`
+        <div class="forecast-item">
+          <div class="forecast-time">${label}</div>
+          <div class="forecast-icon">${WMO_ICONS[codes[i]] || '🌡'}</div>
+          <div class="forecast-temp">${Math.round(temps[i])}°</div>
+        </div>
+      `);
+    }
+
+    body.innerHTML = `
+      <div class="weather-main">
+        <div class="weather-temp">${Math.round(cur.temperature_2m)}°C</div>
+        <div class="weather-info">
+          <div class="weather-desc">${icon} ${desc}</div>
+          <div class="weather-loc">${data.locationName || 'Tu ubicación'}</div>
+        </div>
+      </div>
+      <div class="weather-details">
+        <div class="weather-detail">Humedad <span>${cur.relative_humidity_2m}%</span></div>
+        <div class="weather-detail">Viento <span>${Math.round(cur.wind_speed_10m)} km/h</span></div>
+        <div class="weather-detail">Sens. térmica <span>${Math.round(cur.apparent_temperature)}°C</span></div>
+      </div>
+      <div class="forecast-row">${forecastItems.join('')}</div>
+    `;
+  }
+
+  async function fetchWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
+      `&hourly=temperature_2m,weather_code&forecast_days=2&timezone=auto`;
+
+    // Reverse geocode (free, no key)
+    let locationName = '';
+    try {
+      const geo = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+      const geoData = await geo.json();
+      locationName = geoData.address?.city || geoData.address?.town || geoData.address?.village || geoData.address?.county || '';
+    } catch(e) {}
+
+    const res = await fetch(url);
+    const data = await res.json();
+    data.locationName = locationName;
+    saveWeatherCache({ data, lat, lon, ts: Date.now() });
+    renderWeather(data, false);
+  }
+
+  function initWeather() {
+    const cached = loadWeatherCache();
+
+    if (!navigator.onLine) {
+      if (cached) {
+        renderWeather(cached.data, true);
+      } else {
+        document.getElementById('weather-body').innerHTML =
+          '<div class="weather-loading">Sin conexión y sin datos previos</div>';
+      }
+      return;
+    }
+
+    // Try fresh data
+    if (navigator.geolocation) {
+      document.getElementById('weather-body').innerHTML =
+        '<div class="weather-loading">Obteniendo ubicación...</div>';
+
+      navigator.geolocation.getCurrentPosition(
+        pos => fetchWeather(pos.coords.latitude, pos.coords.longitude).catch(() => {
+          if (cached) renderWeather(cached.data, true);
+          else document.getElementById('weather-body').innerHTML =
+            '<div class="weather-loading">No se pudo obtener el clima</div>';
+        }),
+        () => {
+          // Geolocation denied — use cached or last known coords
+          if (cached) {
+            fetchWeather(cached.lat, cached.lon).catch(() => renderWeather(cached.data, true));
+          } else {
+            document.getElementById('weather-body').innerHTML =
+              '<div class="weather-loading">Permiso de ubicación denegado</div>';
+          }
+        },
+        { timeout: 8000 }
+      );
+    } else {
+      document.getElementById('weather-body').innerHTML =
+        '<div class="weather-loading">Geolocalización no disponible</div>';
+    }
+  }
+
+  initWeather();
+
+  // --- Service Worker + Update detection ---
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+
+      // Check for updates every time the app gets focus
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update();
+      });
+
+      // A new SW is waiting to activate
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version ready — show banner
+            document.getElementById('update-banner').classList.add('visible');
+          }
+        });
+      });
+    });
+
+    // When SW activates and sends SW_UPDATED, reload
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'SW_UPDATED') {
+        window.location.reload();
+      }
+    });
+
+    // Update button: tell SW to skip waiting, then reload
+    document.getElementById('update-btn').addEventListener('click', () => {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg && reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+    });
+  }
+</script>
+</body>
+</html>
