@@ -353,6 +353,35 @@
     }
 
     .char-count.warn { color: #ff6b6b; }
+
+    /* Type selector */
+    .type-selector {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .type-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      padding: 10px 6px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      text-align: center;
+    }
+
+    .type-btn.active {
+      background: var(--accent);
+      color: #0a0a0a;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -372,8 +401,16 @@
 
   <!-- Input card -->
   <div class="card">
-    <label>Texto o URL</label>
-    <textarea id="text-input" placeholder="Escribí cualquier texto, URL, email..." maxlength="2000" rows="4"></textarea>
+    <label>Tipo de contenido</label>
+    <div class="type-selector">
+      <button class="type-btn active" data-type="text">Texto</button>
+      <button class="type-btn" data-type="url">URL</button>
+      <button class="type-btn" data-type="email">Email</button>
+      <button class="type-btn" data-type="phone">Telefono</button>
+    </div>
+
+    <label id="input-label">Texto libre</label>
+    <textarea id="text-input" placeholder="Escribi cualquier texto..." maxlength="2000" rows="4"></textarea>
     <div class="char-count" id="char-count">0 / 2000</div>
 
     <div class="options-row">
@@ -448,15 +485,56 @@
     installBanner.classList.remove('visible');
   });
 
-  // --- Char counter ---
+  // --- Type selector ---
+  const typeBtns = document.querySelectorAll('.type-btn');
+  const inputLabel = document.getElementById('input-label');
   const textInput = document.getElementById('text-input');
   const charCount = document.getElementById('char-count');
+
+  let currentType = 'text';
+
+  const typeConfig = {
+    text:  { label: 'Texto libre',         placeholder: 'Escribi cualquier texto...',      prefix: '' },
+    url:   { label: 'URL o link',           placeholder: 'https://ejemplo.com',             prefix: 'https://' },
+    email: { label: 'Direccion de email',   placeholder: 'nombre@ejemplo.com',              prefix: 'mailto:' },
+    phone: { label: 'Numero de telefono',   placeholder: '+54 9 11 1234-5678',              prefix: 'tel:' },
+  };
+
+  typeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      typeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentType = btn.dataset.type;
+      const cfg = typeConfig[currentType];
+      inputLabel.textContent = cfg.label;
+      textInput.placeholder = cfg.placeholder;
+      textInput.value = '';
+      charCount.textContent = '0 / 2000';
+    });
+  });
 
   textInput.addEventListener('input', () => {
     const len = textInput.value.length;
     charCount.textContent = `${len} / 2000`;
     charCount.classList.toggle('warn', len > 1500);
   });
+
+  // Builds the final QR string based on type
+  function buildQRText(raw) {
+    const val = raw.trim();
+    switch (currentType) {
+      case 'url':
+        // Add https:// if no protocol present
+        return /^https?:\/\//i.test(val) ? val : 'https://' + val;
+      case 'email':
+        return val.startsWith('mailto:') ? val : 'mailto:' + val;
+      case 'phone':
+        return val.startsWith('tel:') ? val : 'tel:' + val.replace(/\s/g, '');
+      default:
+        // Plain text: prefix with zero-width space to prevent auto URL detection
+        return '\u200B' + val;
+    }
+  }
 
   // --- QR Generation ---
   const generateBtn = document.getElementById('generate');
@@ -466,12 +544,13 @@
   let currentQR = null;
 
   generateBtn.addEventListener('click', () => {
-    const text = textInput.value.trim();
-    if (!text) {
-      showToast('Ingresá algún texto primero');
+    const raw = textInput.value.trim();
+    if (!raw) {
+      showToast('Ingresa algun contenido primero');
       return;
     }
 
+    const qrText = buildQRText(raw);
     const size = parseInt(document.getElementById('qr-size').value);
     const errorLevel = document.getElementById('error-level').value;
     const colorDark = document.getElementById('color-dark').value;
@@ -482,7 +561,7 @@
 
     try {
       currentQR = new QRCode(qrContainer, {
-        text: text,
+        text: qrText,
         width: size,
         height: size,
         colorDark: colorDark,
@@ -490,7 +569,6 @@
         correctLevel: QRCode.CorrectLevel[errorLevel]
       });
 
-      // Apply size to container
       qrContainer.querySelector('canvas, img').style.width = size + 'px';
       qrContainer.querySelector('canvas, img').style.height = size + 'px';
 
