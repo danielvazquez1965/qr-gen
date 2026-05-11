@@ -2,7 +2,7 @@
   "name": "QR Gen — Generador de códigos QR",
   "short_name": "QR Gen",
   "description": "Generador de códigos QR offline, sin costos ni límites",
-  "start_url": "/",
+  "start_url": "/qr-gen/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
