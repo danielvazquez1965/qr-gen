@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="description" content="Generador de códigos QR offline" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="QR Gen" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>QR Gen</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --border: #222222;
+      --accent: #e8ff47;
+      --accent-dim: #b8cc2a;
+      --text: #f0f0f0;
+      --muted: #555555;
+      --radius: 4px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100dvh;
+      padding: 24px 16px 40px;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding-top: 8px;
+    }
+
+    header h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -2px;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    header span {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* Input card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card label {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      padding: 14px;
+      resize: none;
+      min-height: 100px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    textarea::placeholder { color: var(--muted); }
+
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    /* Options row */
+    .options-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .option-group {
+      flex: 1;
+      min-width: 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .option-group label {
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      padding: 8px 10px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+
+    select:focus { border-color: var(--accent); }
+
+    .color-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .color-pick {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .color-pick label {
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 36px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+
+    /* Button */
+    button#generate {
+      width: 100%;
+      background: var(--accent);
+      color: #0a0a0a;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 16px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    button#generate:active {
+      background: var(--accent-dim);
+      transform: scale(0.98);
+    }
+
+    button#generate:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* QR Output */
+    .qr-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    .qr-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .qr-label {
+      font-size: 0.6rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      align-self: flex-start;
+    }
+
+    #qr-container {
+      background: white;
+      padding: 16px;
+      border-radius: 2px;
+      line-height: 0;
+    }
+
+    #qr-container canvas,
+    #qr-container img {
+      display: block;
+      max-width: 240px;
+      width: 240px;
+      height: 240px;
+    }
+
+    .qr-actions {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      padding: 12px 8px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      text-align: center;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--accent);
+      color: #0a0a0a;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      transition: transform 0.3s ease;
+      z-index: 100;
+      white-space: nowrap;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Install banner */
+    #install-banner {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.75rem;
+      color: var(--accent);
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #install-banner.visible { display: flex; }
+
+    #install-btn {
+      background: var(--accent);
+      color: #0a0a0a;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 8px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Counter */
+    .char-count {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .char-count.warn { color: #ff6b6b; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <h1>QR_</h1>
+    <span>Generador offline</span>
+  </header>
+
+  <!-- Install banner -->
+  <div id="install-banner">
+    <span>📲 Instalá la app en tu celular</span>
+    <button id="install-btn">Instalar</button>
+  </div>
+
+  <!-- Input card -->
+  <div class="card">
+    <label>Texto o URL</label>
+    <textarea id="text-input" placeholder="Escribí cualquier texto, URL, email..." maxlength="2000" rows="4"></textarea>
+    <div class="char-count" id="char-count">0 / 2000</div>
+
+    <div class="options-row">
+      <div class="option-group">
+        <label>Nivel de error</label>
+        <select id="error-level">
+          <option value="L">Bajo (L)</option>
+          <option value="M" selected>Medio (M)</option>
+          <option value="Q">Alto (Q)</option>
+          <option value="H">Máximo (H)</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>Tamaño</label>
+        <select id="qr-size">
+          <option value="180">Chico</option>
+          <option value="240" selected>Mediano</option>
+          <option value="300">Grande</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="color-row">
+      <div class="color-pick">
+        <label>Color QR</label>
+        <input type="color" id="color-dark" value="#000000" />
+      </div>
+      <div class="color-pick">
+        <label>Fondo</label>
+        <input type="color" id="color-light" value="#ffffff" />
+      </div>
+    </div>
+
+    <button id="generate">Generar QR</button>
+  </div>
+
+  <!-- Output card -->
+  <div class="qr-card" id="qr-card">
+    <span class="qr-label">Código QR generado</span>
+    <div id="qr-container"></div>
+    <div class="qr-actions">
+      <button class="btn-secondary" id="btn-download">↓ Descargar PNG</button>
+      <button class="btn-secondary" id="btn-copy">⎘ Copiar imagen</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- QR library (offline-capable via cache) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+  // --- PWA Install ---
+  let deferredPrompt;
+  const installBanner = document.getElementById('install-banner');
+  const installBtn = document.getElementById('install-btn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBanner.classList.add('visible');
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBanner.classList.remove('visible');
+  });
+
+  // --- Char counter ---
+  const textInput = document.getElementById('text-input');
+  const charCount = document.getElementById('char-count');
+
+  textInput.addEventListener('input', () => {
+    const len = textInput.value.length;
+    charCount.textContent = `${len} / 2000`;
+    charCount.classList.toggle('warn', len > 1500);
+  });
+
+  // --- QR Generation ---
+  const generateBtn = document.getElementById('generate');
+  const qrContainer = document.getElementById('qr-container');
+  const qrCard = document.getElementById('qr-card');
+
+  let currentQR = null;
+
+  generateBtn.addEventListener('click', () => {
+    const text = textInput.value.trim();
+    if (!text) {
+      showToast('Ingresá algún texto primero');
+      return;
+    }
+
+    const size = parseInt(document.getElementById('qr-size').value);
+    const errorLevel = document.getElementById('error-level').value;
+    const colorDark = document.getElementById('color-dark').value;
+    const colorLight = document.getElementById('color-light').value;
+
+    qrContainer.innerHTML = '';
+    currentQR = null;
+
+    try {
+      currentQR = new QRCode(qrContainer, {
+        text: text,
+        width: size,
+        height: size,
+        colorDark: colorDark,
+        colorLight: colorLight,
+        correctLevel: QRCode.CorrectLevel[errorLevel]
+      });
+
+      // Apply size to container
+      qrContainer.querySelector('canvas, img').style.width = size + 'px';
+      qrContainer.querySelector('canvas, img').style.height = size + 'px';
+
+      qrCard.classList.add('visible');
+      qrCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {
+      showToast('Error al generar el QR. Texto muy largo?');
+    }
+  });
+
+  // --- Download ---
+  document.getElementById('btn-download').addEventListener('click', () => {
+    const canvas = qrContainer.querySelector('canvas');
+    if (!canvas) { showToast('Generá un QR primero'); return; }
+    const link = document.createElement('a');
+    link.download = 'qr-code.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('Imagen descargada');
+  });
+
+  // --- Copy ---
+  document.getElementById('btn-copy').addEventListener('click', async () => {
+    const canvas = qrContainer.querySelector('canvas');
+    if (!canvas) { showToast('Generá un QR primero'); return; }
+    try {
+      canvas.toBlob(async (blob) => {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        showToast('Imagen copiada al portapapeles');
+      });
+    } catch (e) {
+      showToast('No se pudo copiar (usá Descargar)');
+    }
+  });
+
+  // --- Toast ---
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  // --- Enter key to generate ---
+  textInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.ctrlKey) generateBtn.click();
+  });
+
+  // --- Service Worker ---
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
+</body>
+</html>
