@@ -1,4 +1,4 @@
-const CACHE = 'qrgen-v1';
+const CACHE = 'qrgen-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -12,15 +12,20 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
   );
-  self.skipWaiting();
+  // No skipWaiting: wait for user confirmation before activating
 });
 
-// Activate: clean old caches
+// Activate: clean old caches and notify clients
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    ).then(() => {
+      // Notify all open tabs that a new version is ready
+      self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+      });
+    })
   );
   self.clients.claim();
 });
@@ -38,4 +43,11 @@ self.addEventListener('fetch', (e) => {
       }).catch(() => caches.match('/index.html'));
     })
   );
+});
+
+// Listen for skip message from the app
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
