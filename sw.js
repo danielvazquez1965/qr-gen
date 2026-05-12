@@ -1,4 +1,5 @@
-const CACHE = 'qrgen-v3';
+const CACHE = 'qrgen-v4';
+// v4:20260511 gratis y a perpetuidad
 // v3:20260511 trackea: Fecha	Hora	Tipo QR	Ciudad	País	Latitud	Longitud
 // v2:20260511 compartida con Diego
 const ASSETS = [
