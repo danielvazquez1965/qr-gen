@@ -97,51 +97,55 @@
     .header-share {
       margin-left: auto;
       background: transparent;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
-      font-size: 1.2rem;
-      width: 38px;
-      height: 38px;
+      border: none;
+      padding: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: border-color 0.2s, color 0.2s;
       flex-shrink: 0;
+      opacity: 0.85;
+      transition: opacity 0.2s;
     }
 
-    .header-share:hover {
-      border-color: var(--accent);
-      color: var(--accent);
+    .header-share:hover { opacity: 1; }
+
+    .header-share svg {
+      width: 28px;
+      height: 28px;
     }
 
-    /* Sanctuary link */
-    .sanctuary-link {
+    /* Sanctuary mini-card */
+    .sanctuary-card {
+      background: #1a1a6e;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 6px 30px rgba(0,0,0,0.4);
+      cursor: pointer;
+      text-decoration: none;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      background: var(--surface);
-      border: 1px solid var(--accent);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      text-decoration: none;
-      color: var(--accent);
-      font-family: 'Syne', sans-serif;
-      font-size: 1rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      transition: background 0.2s;
+      gap: 14px;
+      padding: 16px 20px;
+      transition: transform 0.15s;
     }
 
-    .sanctuary-link:hover {
-      background: #1a1a00;
-    }
+    .sanctuary-card:active { transform: scale(0.98); }
 
-    .sanctuary-link .sanctuary-icon {
-      font-size: 1.3rem;
+    .sanctuary-card img {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
       flex-shrink: 0;
+    }
+
+    .sanctuary-card span {
+      color: #f5c400;
+      font-family: Georgia, serif;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
     }
 
     /* Input card */
@@ -603,7 +607,15 @@
   <header>
     <h1>QR_</h1>
     <span>Generador offline</span>
-    <button class="header-share" id="btn-share" title="Compartir app">⬆</button>
+    <button class="header-share" id="btn-share" title="Compartir app">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="18" cy="5" r="3" stroke="#e8ff47" stroke-width="2"/>
+        <circle cx="6" cy="12" r="3" stroke="#e8ff47" stroke-width="2"/>
+        <circle cx="18" cy="19" r="3" stroke="#e8ff47" stroke-width="2"/>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" stroke="#e8ff47" stroke-width="2" stroke-linecap="round"/>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" stroke="#e8ff47" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
   </header>
 
   <!-- Install banner -->
@@ -666,10 +678,10 @@
     <button id="generate">Generar QR</button>
   </div>
 
-  <!-- Sanctuary link -->
-  <a class="sanctuary-link" href="https://schoenstatt-la-plata.github.io/horarios-santuario/estado.html" target="_blank" rel="noopener">
-    <span class="sanctuary-icon">⛪</span>
-    ¿Está abierto ahora el Santuario?
+  <!-- Sanctuary mini-card -->
+  <a class="sanctuary-card" href="https://schoenstatt-la-plata.github.io/horarios-santuario/estado.html" target="_blank" rel="noopener">
+    <img src="https://schoenstatt-la-plata.github.io/horarios-santuario/logo.png" alt="Logo Schoenstatt" onerror="this.style.display='none'">
+    <span>¿Está abierto el Santuario ahora?</span>
   </a>
 
   <!-- Weather widget -->
