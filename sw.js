@@ -1,4 +1,6 @@
-const CACHE = 'qrgen-v2'; // v0:20260511 ← incrementar: v3, v4, v5...
+const CACHE = 'qrgen-v3';
+// v3:20260511 trackea: Fecha	Hora	Tipo QR	Ciudad	País	Latitud	Longitud
+// v2:20260511 compartida con Diego
 const ASSETS = [
   '/',
   '/index.html',
