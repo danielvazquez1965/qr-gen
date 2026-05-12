@@ -680,7 +680,7 @@
 
   <!-- Sanctuary mini-card -->
   <a class="sanctuary-card" href="https://schoenstatt-la-plata.github.io/horarios-santuario/estado.html" target="_blank" rel="noopener">
-    <img src="logo.png" alt="Logo Schoenstatt">
+    <img src="https://schoenstatt-la-plata.github.io/horarios-santuario/logo.png" alt="Logo Schoenstatt" onerror="this.style.display='none'">
     <span>¿Está abierto el Santuario ahora?</span>
   </a>
 
@@ -844,6 +844,9 @@
 
       qrCard.classList.add('visible');
       qrCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      // Track uso
+      trackUso(currentType);
     } catch (e) {
       showToast('Error al generar el QR. Texto muy largo?');
     }
@@ -1027,6 +1030,44 @@
   }
 
   initWeather();
+
+  // --- Tracking ---
+  const STATS_URL = 'https://script.google.com/macros/s/AKfycbxObD65tCHBcrUwtiupyOT9wDIbsqVFBZKZ2taknNomEo-ee01iLy2x5D2eY53kRQNc/exec';
+
+  async function trackUso(tipo) {
+    try {
+      const ahora = new Date();
+      const fecha = ahora.toLocaleDateString('es-AR');
+      const hora  = ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+      // Intentar obtener ubicación (ya puede estar disponible del clima)
+      let lat = '', lon = '', ciudad = '', pais = '';
+      const cached = (() => { try { return JSON.parse(localStorage.getItem('qrgen_weather_cache')); } catch(e) { return null; } })();
+
+      if (cached) {
+        lat  = cached.lat  || '';
+        lon  = cached.lon  || '';
+        // Extraer ciudad y país del dato guardado
+        ciudad = cached.data?.locationName || '';
+        // Reverse geocode rápido para el país
+        if (lat && lon && !pais) {
+          try {
+            const g = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+            const gd = await g.json();
+            ciudad = ciudad || gd.address?.city || gd.address?.town || gd.address?.village || '';
+            pais   = gd.address?.country || '';
+          } catch(e) {}
+        }
+      }
+
+      await fetch(STATS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha, hora, tipo, ciudad, pais, lat, lon })
+      });
+    } catch(e) {}
+  }
 
   // --- Service Worker + Update detection ---
   if ('serviceWorker' in navigator) {
