@@ -94,6 +94,56 @@
       text-transform: uppercase;
     }
 
+    .header-share {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 1.2rem;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .header-share:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Sanctuary link */
+    .sanctuary-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      text-decoration: none;
+      color: var(--accent);
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      transition: background 0.2s;
+    }
+
+    .sanctuary-link:hover {
+      background: #1a1a00;
+    }
+
+    .sanctuary-link .sanctuary-icon {
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+
     /* Input card */
     .card {
       background: var(--surface);
@@ -515,6 +565,35 @@
       color: var(--accent);
       text-decoration: none;
     }
+
+    /* Update banner */
+    #update-banner {
+      display: none;
+      background: #1a1a00;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.75rem;
+      color: var(--accent);
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #update-banner.visible { display: flex; }
+
+    #update-btn {
+      background: var(--accent);
+      color: #0a0a0a;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 8px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -524,12 +603,19 @@
   <header>
     <h1>QR_</h1>
     <span>Generador offline</span>
+    <button class="header-share" id="btn-share" title="Compartir app">⬆</button>
   </header>
 
   <!-- Install banner -->
   <div id="install-banner">
     <span>📲 Instalá la app en tu celular</span>
     <button id="install-btn">Instalar</button>
+  </div>
+
+  <!-- Update banner -->
+  <div id="update-banner">
+    <span>🆕 Hay una nueva versión disponible</span>
+    <button id="update-btn">Actualizar</button>
   </div>
 
   <!-- Input card -->
@@ -580,6 +666,12 @@
     <button id="generate">Generar QR</button>
   </div>
 
+  <!-- Sanctuary link -->
+  <a class="sanctuary-link" href="https://schoenstatt-la-plata.github.io/horarios-santuario/estado.html" target="_blank" rel="noopener">
+    <span class="sanctuary-icon">⛪</span>
+    ¿Está abierto ahora el Santuario?
+  </a>
+
   <!-- Weather widget -->
   <div class="weather-card" id="weather-card">
     <div class="weather-header">
@@ -613,6 +705,26 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script>
+  // --- Share button ---
+  document.getElementById('btn-share').addEventListener('click', async () => {
+    const shareData = {
+      title: 'QR Gen — Generador de códigos QR',
+      text: 'Generá códigos QR gratis, sin publicidad y funciona offline.',
+      url: 'https://danielvazquez1965.github.io/qr-gen/'
+    };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch(e) {}
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareData.url);
+        showToast('Link copiado al portapapeles');
+      } catch(e) {
+        showToast('https://danielvazquez1965.github.io/qr-gen/');
+      }
+    }
+  });
+
   // --- PWA Install ---
   let deferredPrompt;
   const installBanner = document.getElementById('install-banner');
@@ -904,9 +1016,42 @@
 
   initWeather();
 
-  // --- Service Worker ---
+  // --- Service Worker + Update detection ---
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.register('sw.js').then(reg => {
+
+      // Check for updates every time the app gets focus
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update();
+      });
+
+      // A new SW is waiting to activate
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version ready — show banner
+            document.getElementById('update-banner').classList.add('visible');
+          }
+        });
+      });
+    });
+
+    // When SW activates and sends SW_UPDATED, reload
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'SW_UPDATED') {
+        window.location.reload();
+      }
+    });
+
+    // Update button: tell SW to skip waiting, then reload
+    document.getElementById('update-btn').addEventListener('click', () => {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg && reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+    });
   }
 </script>
 </body>
