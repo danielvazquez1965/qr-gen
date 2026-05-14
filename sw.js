@@ -1,4 +1,5 @@
-const CACHE = 'qrgen-v4';
+const CACHE = 'qrgen-v5';
+// v5:20260513 muestra santuario sólo en La Plata
 // v4:20260511 gratis y a perpetuidad
 // v3:20260511 trackea: Fecha	Hora	Tipo QR	Ciudad	País	Latitud	Longitud
 // v2:20260511 compartida con Diego
