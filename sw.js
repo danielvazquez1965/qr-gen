@@ -1,5 +1,5 @@
 const CACHE = 'qrgen-v8';
-// v7:20260513 -34.9215, -57.9545, radiusKm: 15 coordenadas del santuario
+// v8:20260513 -34.9215, -57.9545, radiusKm: 15 coordenadas del santuario
 // v7:20260513 -34.9237782, -57.955722, radiusKm: 15 coordenadas del santuario
 // v6:20260513 muestra santuario sólo en La Plata, radiusKm: 15
 // v5:20260513 muestra santuario sólo en lat: -30.9215, lon: -57.9545, radiusKm: 15
