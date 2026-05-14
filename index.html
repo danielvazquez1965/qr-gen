@@ -570,7 +570,9 @@
       text-decoration: none;
     }
 
-    /* Update banner */
+    /* Sanctuary card hidden by default */
+    #sanctuary-card { display: none; }
+    #sanctuary-card.visible { display: flex; }
     #update-banner {
       display: none;
       background: #1a1a00;
@@ -679,7 +681,7 @@
   </div>
 
   <!-- Sanctuary mini-card -->
-  <a class="sanctuary-card" href="https://schoenstatt-la-plata.github.io/horarios-santuario/estado.html" target="_blank" rel="noopener">
+  <a id="sanctuary-card" class="sanctuary-card" href="https://schoenstatt-la-plata.github.io/horarios-santuario/estado.html" target="_blank" rel="noopener">
     <img src="https://schoenstatt-la-plata.github.io/horarios-santuario/logo.png" alt="Logo Schoenstatt" onerror="this.style.display='none'">
     <span>¿Está abierto el Santuario ahora?</span>
   </a>
@@ -720,8 +722,8 @@
   // --- Share button ---
   document.getElementById('btn-share').addEventListener('click', async () => {
     const shareData = {
-      title: 'QR Gen — Generador de códigos QR - v.3',
-      text: 'Generá códigos QR gratis y a perpetuidad.',
+      title: 'QR Gen — Generador de códigos QR',
+      text: 'Generá códigos QR gratis, sin publicidad y funciona offline.',
       url: 'https://danielvazquez1965.github.io/qr-gen/'
     };
     if (navigator.share) {
@@ -968,6 +970,24 @@
     `;
   }
 
+  // La Plata center coords and ~15km radius
+  const LA_PLATA = { lat: -34.9215, lon: -57.9545, radiusKm: 15 };
+
+  function distanciaKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function checkSantuario(lat, lon) {
+    const dist = distanciaKm(lat, lon, LA_PLATA.lat, LA_PLATA.lon);
+    if (dist <= LA_PLATA.radiusKm) {
+      document.getElementById('sanctuary-card').classList.add('visible');
+    }
+  }
+
   async function fetchWeather(lat, lon) {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
       `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
@@ -985,6 +1005,7 @@
     const data = await res.json();
     data.locationName = locationName;
     saveWeatherCache({ data, lat, lon, ts: Date.now() });
+    checkSantuario(lat, lon);
     renderWeather(data, false);
   }
 
@@ -993,6 +1014,7 @@
 
     if (!navigator.onLine) {
       if (cached) {
+        checkSantuario(cached.lat, cached.lon);
         renderWeather(cached.data, true);
       } else {
         document.getElementById('weather-body').innerHTML =
