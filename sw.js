@@ -1,6 +1,6 @@
 const CACHE = 'qrgen-v6';
-// v5:20260513 muestra santuario sólo en La Plata
-// v5:20260513 muestra santuario sólo en La Plata
+// v6:20260513 muestra santuario sólo en La Plata, radiusKm: 15
+// v5:20260513 muestra santuario sólo en lat: -30.9215, lon: -57.9545, radiusKm: 15
 // v4:20260511 gratis y a perpetuidad
 // v3:20260511 trackea: Fecha	Hora	Tipo QR	Ciudad	País	Latitud	Longitud
 // v2:20260511 compartida con Diego
